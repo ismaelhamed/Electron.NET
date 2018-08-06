@@ -3,7 +3,7 @@
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
     "iisExpress": {
-      "applicationUrl": "http://localhost:50394/",
+      "applicationUrl": "http://localhost:55841/",
       "sslPort": 0
     }
   },
@@ -20,7 +20,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "applicationUrl": "http://localhost:50395/"
+      "applicationUrl": "http://localhost:55841/"
     },
     "Electron.NET App": {
       "commandName": "Executable",

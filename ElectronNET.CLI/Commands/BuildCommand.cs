@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading.Tasks;
 using ElectronNET.CLI.Commands.Actions;
 
@@ -41,60 +39,58 @@ namespace ElectronNET.CLI.Commands
             {
                 Console.WriteLine("Build Electron Application...");
 
-                SimpleCommandLineParser parser = new SimpleCommandLineParser();
+                var parser = new SimpleCommandLineParser();
                 parser.Parse(_args);
 
+                // Desired and specified platform
                 var desiredPlatform = parser.Arguments[_paramTarget][0];
-                string specifiedFromCustom = string.Empty;
+                var specifiedFromCustom = string.Empty;
                 if (desiredPlatform == "custom" && parser.Arguments[_paramTarget].Length > 1)
                 {
                     specifiedFromCustom = parser.Arguments[_paramTarget][1];
                 }
 
-                string configuration = "Release";
+                var platformInfo = GetTargetPlatformInformation.Do(desiredPlatform, specifiedFromCustom);
+
+                // Desired configuration arg
+                var configuration = "Release";
                 if (parser.Arguments.ContainsKey(_paramDotNetConfig))
                 {
                     configuration = parser.Arguments[_paramDotNetConfig][0];
                 }
 
-                var platformInfo = GetTargetPlatformInformation.Do(desiredPlatform, specifiedFromCustom);
-
-                Console.WriteLine($"Build ASP.NET Core App for {platformInfo.NetCorePublishRid}...");
-
-
-                string tempPath = Path.Combine(Directory.GetCurrentDirectory(), "obj", "desktop", desiredPlatform);
+                // Set TempPath and execute dotnet build in this directory
+                var tempPath = Path.Combine(Directory.GetCurrentDirectory(), "obj", "desktop", desiredPlatform);
                 if (Directory.Exists(tempPath) == false)
                 {
                     Directory.CreateDirectory(tempPath);
                 }
 
+                // TODO: Log.Debug
                 Console.WriteLine("Executing dotnet publish in this directory: " + tempPath);
 
-                string tempBinPath = Path.Combine(tempPath, "bin");
-
                 Console.WriteLine($"Build ASP.NET Core App for {platformInfo.NetCorePublishRid} under {configuration}-Configuration...");
-
-                var resultCode = ProcessHelper.CmdExecute($"dotnet publish -r {platformInfo.NetCorePublishRid} -c {configuration} --output \"{tempBinPath}\"", Directory.GetCurrentDirectory());
-
+                var resultCode = ProcessHelper.CmdExecute($"dotnet publish -r {platformInfo.NetCorePublishRid} -c {configuration} --output \"{Path.Combine(tempPath, "bin")}\"", Directory.GetCurrentDirectory());
                 if (resultCode != 0)
                 {
                     Console.WriteLine("Error occurred during dotnet publish: " + resultCode);
                     return false;
                 }
 
+                // Embed electron files
                 DeployEmbeddedElectronFiles.Do(tempPath);
 
                 var checkForNodeModulesDirPath = Path.Combine(tempPath, "node_modules");
 
                 if (Directory.Exists(checkForNodeModulesDirPath) == false)
                 {
+                    // TODO: Log.Debug
                     Console.WriteLine("node_modules missing in: " + checkForNodeModulesDirPath);
 
                     Console.WriteLine("Start npm install...");
                     ProcessHelper.CmdExecute("npm install", tempPath);
 
                     Console.WriteLine("Start npm install electron-packager...");
-
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
                         // Works proper on Windows... 
@@ -109,37 +105,34 @@ namespace ElectronNET.CLI.Commands
                 }
                 else
                 {
+                    // TODO: Log.Warning
                     Console.WriteLine("Skip npm install, because node_modules directory exists in: " + checkForNodeModulesDirPath);
                 }
 
                 Console.WriteLine("Build Electron Desktop Application...");
-                string buildPath = Path.Combine(Directory.GetCurrentDirectory(), "bin", "desktop");
 
-                Console.WriteLine("Executing electron magic in this directory: " + buildPath);
+                // TODO: Need a solution for --asar support
 
-                // ToDo: Need a solution for --asar support
-
-                string electronArch = "x64";
+                var electronArch = "x64";
                 if (parser.Arguments.ContainsKey(_paramElectronArch))
                 {
                     electronArch = parser.Arguments[_paramElectronArch][0];
                 }
 
-                string electronParams = "";
+                var electronParams = "";
                 if (parser.Arguments.ContainsKey(_paramElectronParams))
                 {
                     electronParams = parser.Arguments[_paramElectronParams][0];
                 }
 
-                Console.WriteLine($"Package Electron App for Platform {platformInfo.ElectronPackerPlatform}...");
-                ProcessHelper.CmdExecute($"electron-packager . --platform={platformInfo.ElectronPackerPlatform} --arch={electronArch} {electronParams} --out=\"{buildPath}\" --overwrite", tempPath);
+                Console.WriteLine($"Packaging Electron App for Platform {platformInfo.ElectronPackerPlatform}...");
+                ProcessHelper.CmdExecute($"electron-packager . --platform={platformInfo.ElectronPackerPlatform} --arch={electronArch} {electronParams} --out=\"{Path.Combine(Directory.GetCurrentDirectory(), "bin", "desktop")}\" --overwrite", tempPath);
+                Console.WriteLine("Packaging done.");
 
-                Console.WriteLine("... done");
-
+                Console.WriteLine("");
+                Console.WriteLine("Build succeeded. Congrats!");
                 return true;
             });
         }
-
-
     }
 }
